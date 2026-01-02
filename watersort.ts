@@ -276,34 +276,34 @@ function invokeEncrypt(TextEncryptUtil: any) {
     });
 }
 
-async function traceAllMethods(TextEncryptUtil: any) {
-    // const decrypt = TextEncryptUtil.method("FGNACANOIEC");
+// async function traceAllMethods(TextEncryptUtil: any) {
+//     // const decrypt = TextEncryptUtil.method("FGNACANOIEC");
 
-    // Il2Cpp.trace(true).methods(decrypt).and().attach();
+//     // Il2Cpp.trace(true).methods(decrypt).and().attach();
 
-    const targetMethods = [
-        "FJGPIPBINEK", // Key generation
-        "MKLNCANLLLL", // IV generation
-        "FGNACANOIEC", // Decryption
-        "LHHIMCAIFDM", // Encryption
-        "LHNGCODGGNG"  // Another encryption method
-    ];
+//     const targetMethods = [
+//         "FJGPIPBINEK", // Key generation
+//         "MKLNCANLLLL", // IV generation
+//         "FGNACANOIEC", // Decryption
+//         "LHHIMCAIFDM", // Encryption
+//         "LHNGCODGGNG"  // Another encryption method
+//     ];
 
-    for (const methodName of targetMethods) {
-        try {
-            const method = findMethodByName(TextEncryptUtil, methodName);
-            if (method) {
-                console.log(`[+] Found ${methodName} at 0x${method.virtualAddress.toString(16)}`);
-                Il2Cpp.trace(true).methods(method).and().attach();
-            } else {
-                console.log(`[!] Method ${methodName} not found`);
-            }
-        } catch (e: any) {
-            console.log(`[!] Error with ${methodName}: ${e.message}`);
-        }
-    }
+//     for (const methodName of targetMethods) {
+//         try {
+//             const method = findMethodByName(TextEncryptUtil, methodName);
+//             if (method) {
+//                 console.log(`[+] Found ${methodName} at 0x${method.virtualAddress.toString(16)}`);
+//                 Il2Cpp.trace(true).methods(method).and().attach();
+//             } else {
+//                 console.log(`[!] Method ${methodName} not found`);
+//             }
+//         } catch (e: any) {
+//             console.log(`[!] Error with ${methodName}: ${e.message}`);
+//         }
+//     }
 
-}
+// }
 
 async function hookByVirtualAddress(TextEncryptUtil: any) {
     // Find methods by name and hook using their virtual addresses
@@ -505,6 +505,165 @@ async function hookMethodAtAddress(method: any, methodName: string) {
     }
 }
 
+function test2() {
+    Il2Cpp.perform(() => {
+        // const assembly = Il2Cpp.domain.assembly("ScriptsFramework.Common");
+        const assembly = Il2Cpp.domain.assembly("ScriptsGame");
+        
+        // 安全验证函数
+        function isValidPointer(ptr:any) {
+            if (!ptr || ptr.isNull()) return false;
+            
+            // 检查指针是否在合法范围内
+            const addr = ptr.toInt32();
+            if (addr < 0x1000 || addr > 0x7fffffffff) return false;
+            
+            // try {
+            //     // 尝试读取第一个字节（非常谨慎）
+            //     Memory.readByte(ptr);
+            //     return true;
+            // } catch (e) {
+            //     return false;
+            // }
+        }
 
+        for (const cls of assembly.image.classes) {
+            // console.log(`[+] Class: ${cls.name}`);
+            if (!cls.namespace === "Game.WaterPlay"){
+                console.log(`[-] pass no relative Class: ${cls.name}`);
+                continue;
+            }
+
+            if (cls.name.includes("CtrWater")
+                || cls.name.includes("BottleModule")
+                || cls.name.includes("Bottle")
+                || cls.name.includes("WaterGame")
+                || cls.name.includes("PageCorePlay")
+                || cls.name.includes("AppManager")
+                || cls.name.includes("PNNEKBADFJD")
+                || cls.name.includes("PlantModule")
+                || cls.name.includes("CtrChallengeBtn")
+                || cls.name.includes("ParticleSystemColorHelper")
+                || cls.name.includes("HOGACHDAODM")
+                || cls.name.includes("ABTestModule")
+            ){
+                continue;
+            }
+            
+             if (!cls.name.includes("ColorConfigManager"))
+             {
+                continue;
+             }
+             //ColorConfigManager 在倒水的时候会被调用
+            for (const method of cls.methods) {
+                // 跳过无效方法
+                if (!method || !method.virtualAddress || method.virtualAddress.isNull()
+                // || !isValidPointer(method.virtualAddress
+                ) {
+                    console.log(`[-] Skipping invalid method: ${method.name}`);
+                    continue;
+                }
+                
+                if (method.name.includes(".ctor") || 
+                    method.name.includes(".cctor") || 
+                    method.name.includes("Finalize") ||
+                    method.name.includes("Dispose") ||
+                    method.name.includes("Update")
+                ) {
+                    console.log(`  [-] Skipping constructor/destructor: ${method.name}`);
+                    continue;
+                }
+                //动瓶子会调用GJMBAMJELEP
+                // 方法信息日志
+                console.log(`  [*] Method: ${method.name}`);
+                // console.log(`    - Static: ${method.isStatic}`);
+                // console.log(`    - Parameters: ${method.parameters.length}`);
+                // console.log(`    - Return type: ${method.returnType.name}`);
+                // console.log(`    - Virtual address: ${method.virtualAddress}`);
+                
+                // Hook 方法
+                Interceptor.attach(method.virtualAddress, {
+                    onEnter: function(args) {
+
+                        // if (method.name.includes("")){
+                        //     return;
+                        // }
+
+                        console.log(`\n[+] ${cls.name}.${method.name} called`);
+                        
+                        // 打印实例指针（如果是实例方法）
+                        if (!method.isStatic) {
+                            const instance = args[0];
+                            console.log(`  Instance: ${instance}`);
+                        }
+                        
+                        // 打印参数
+                        const startIndex = method.isStatic ? 0 : 1;
+                        method.parameters.forEach((param, idx) => {
+                            const argIndex = startIndex + idx;
+                            const arg = args[argIndex];
+                            
+                            console.log(`  Param[${idx}] ${param.name} (${param.type.name}): ${arg}`);
+                            
+                            // 如果是字符串类型，尝试读取内容
+                            if (param.type.name === "System.String" && !arg.isNull()) {
+                                try {
+                                    const stringObj = new Il2Cpp.String(arg);
+                                    console.log(`    String content: "${stringObj.content}"`);
+                                } catch(e) {
+                                    // // 尝试其他方式读取 报错
+                                    // try {
+                                    //     const utf16Str = Memory.readUtf16String(arg);
+                                    //     if (utf16Str) {
+                                    //         console.log(`    String content: "${utf16Str}"`);
+                                    //     }
+                                    // } catch(e2) {
+                                    //     console.log(`    Could not read string: ${e.message}`);
+                                    // }
+                                }
+                            }
+                        });
+                    },
+                    
+                    // onLeave: function(retval) {
+                    //     console.log(`\n[+] ${cls.name}.${method.name} returning`);
+                    //     console.log(`  Return value: ${retval}`);
+                    //     console.log(`  Return type: ${method.returnType.name}`);
+                        
+                    //     // 如果是字符串返回类型
+                    //     if (method.returnType.name === "System.String" && !retval.isNull()) {
+                    //         try {
+                    //             const resultString = new Il2Cpp.String(retval);
+                    //             console.log(`  Return string: "${resultString.content}"`);
+                    //         } catch(e) {
+                    //             // try {
+                    //             //     const utf16Str = Memory.readUtf16String(retval);
+                    //             //     if (utf16Str) {
+                    //             //         console.log(`  Return string: "${utf16Str}"`);
+                    //             //     }
+                    //             // } catch(e2) {
+                    //             //     console.log(`  Could not read return string: ${e.message}`);
+                    //             // }
+                    //         }
+                    //     }
+                        
+                    //     // // 记录调用堆栈（可选）//报错
+                    //     // console.log('  Call stack:');
+                    //     // Thread.backtrace(this.context, Backtracer.ACCURATE)
+                    //     //     .map(DebugSymbol.fromAddress)
+                    //     //     .forEach(symbol => {
+                    //     //         console.log(`    ${symbol}`);
+                    //     //     });
+                    // }
+                });
+            }
+        }
+        
+        console.log("\n[+] All methods hooked successfully!");
+    });
+}
 
 // Il2Cpp.perform(getKeyIV_All).catch(console.error);
+// Il2Cpp.perform(test).catch(console.error);
+// Il2Cpp.perform(test1).catch(console.error);
+Il2Cpp.perform(test2).catch(console.error);
